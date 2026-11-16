@@ -1,0 +1,43 @@
+name: Build unsigned IPA
+
+# Build IPA chưa ký trên máy macOS của GitHub Actions.
+# File IPA tải ở mục Artifacts, rồi ký bằng ESign / AltStore / Sideloadly
+# với chứng chỉ của huynh rồi cài lên iPhone.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate AppIcon PNGs
+        run: bash scripts/generate-icons.sh
+
+      - name: Build app (unsigned)
+        run: |
+          xcodebuild -project CustomBlocker.xcodeproj \
+            -scheme CustomBlocker \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY= \
+            build
+
+      - name: Package IPA
+        run: |
+          APP="build/Build/Products/Release-iphoneos/CustomBlocker.app"
+          test -d "$APP" || { echo "Khong tim thay $APP"; exit 1; }
+          mkdir -p Payload
+          cp -r "$APP" Payload/
+          zip -r CustomBlocker-unsigned.ipa Payload
+          ls -la CustomBlocker-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CustomBlocker-unsigned-ipa
+          path: CustomBlocker-unsigned.ipa
+          if-no-files-found: error
